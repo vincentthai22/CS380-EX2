@@ -40,24 +40,52 @@ class ReceiverClient implements Runnable {
             InputStreamReader isr = new InputStreamReader(is, "UTF-8");
             BufferedReader br = new BufferedReader(isr);
             int i = 0;
+            System.out.println("Connected to server.\nReceived bytes:");
             while(true) {
+                if(i%8  == 0)
+                    System.out.println();
                 Byte leftByte, rightByte;
                 if(i == byteMessage.length) break;
                 Integer bytes;
-                bytes = is.read() << 2;
+                bytes = is.read() << 4;
                 bytes |= is.read();
-                System.out.print(Integer.toHexString(bytes));
-                if(i%8  == 0)
-                    System.out.println();
+                System.out.print(Integer.toHexString(bytes& 0XFF).toUpperCase() );
                 byteMessage[i++] = bytes.byteValue();
             }
 
             CRC32 cyclicRedundancyCheck = new CRC32();
             cyclicRedundancyCheck.update(getByteMessage());
             System.out.println("\nGenerated CRC32\t" + Long.toHexString(cyclicRedundancyCheck.getValue()));
-            new Thread(new SenderClient(host, port, cyclicRedundancyCheck.getValue())).start();
+            System.out.println(cyclicRedundancyCheck.getValue());
+            long crcVal = cyclicRedundancyCheck.getValue();
+            OutputStream os = socket.getOutputStream();
+            PrintStream out = new PrintStream(os, true, "UTF-8");
+            for (int j = 3; j >= 0; j-=1){
+                os.write((byte)(crcVal >> j * 8));
+            }
+//            long leftMask = Long.decode("1111111100000000"), rightMask = Long.decode("11111111");
+//            leftMask &= cyclicRedundancyCheck.getValue();
+//            rightMask &= cyclicRedundancyCheck.getValue();
+//            out.print(leftMask);
+//            out.print(rightMask);
+//            out.println(Long.toHexString(cyclicRedundancyCheck.getValue()));
+//            for(byte b : byteArray) {
+//                if(i % 4 == 0) {
+//                    out.println(msg);
+//                    System.out.println("byte is" + msg);
+//                    msg = 0;
+//                }
+//                msg |= b;
+//                msg <<= msg;
+//                i++;
+//            }
             while(true){
-                System.out.println(is.read());
+                if(is.read() == 1){
+                    System.out.println("1\n" + "Response good.");
+                } else {
+                    System.out.println("0\n" + "Response bad.");
+                }
+                break;
             }
         } catch (NullPointerException e){
             System.out.println("Connection Lost");
@@ -74,59 +102,5 @@ class ReceiverClient implements Runnable {
 
     public byte[] getByteMessage(){
         return byteMessage;
-    }
-}
-class SenderClient implements Runnable {
-    String host;
-    int port;
-    long message;
-    byte[] byteArray;
-    String stringByteArray;
-
-    public SenderClient(String host, int port,long message ){
-        this.host = host;
-        this.port=port;
-        this.message = message;
-        byteArray = Long.toBinaryString(message).getBytes();
-        stringByteArray = Long.toBinaryString(message);
-
-        //System.out.println("size of byte arr " + stringByteArray);
-    }
-
-    @Override
-    public void run() {
-        try (Socket socket = new Socket(host, port)) {
-            BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
-            OutputStream os = socket.getOutputStream();
-            PrintStream out = new PrintStream(os, true, "UTF-8");
-            int msg = 0;
-            String message="";
-            while(true) {
-//                for(byte b : byteArray) {
-//                    msg |= b;
-//                    msg <<= msg;
-//                    if(i % 4 == 0) {
-//                        out.println(msg);
-//                        System.out.println("byte is" + msg);
-//                        msg = 0;
-//                    }
-//                    i++;
-//                }
-                for(int i =0 ; i < stringByteArray.length(); i++){
-                    if(i % 4 == 0){
-                        out.print(message);
-                        System.out.println(message);
-                        message = "";
-                    }
-
-                    message += stringByteArray.charAt(i);
-                }
-                break;
-            }
-        } catch (NullPointerException e){
-            System.out.println("Failed to connect.. try again.");
-        } catch (IOException e){
-
-        }
     }
 }
